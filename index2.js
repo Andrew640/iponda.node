@@ -59,6 +59,11 @@ var torun = function(conn) {
                             console.log(summary);
                         });
 
+                        r.db('twitter').table('handles').get(result.handle).hasFields('user_id').eq(!null).run(conn, function(err, summary) {
+                            console.log(err);
+                            console.log(summary);
+                        });
+
                     })
                     .getUserTimeline({ screen_name: result.handle, count:200 }, function(data) {
 

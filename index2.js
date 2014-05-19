@@ -20,6 +20,8 @@ var twitter = new twitterlib({
 var seconds = 5;
 var millies = seconds * 1000;
 
+var twitterstream = null;
+
 var options = {
     host: 'localhost',
     port: 28015,
@@ -28,20 +30,42 @@ var options = {
 // ++++++++++++++++++++++++++++++++++++
 // Function to run every XX seconds
 // ++++++++++++++++++++++++++++++++++++
+//
+// twitter.stream('statuses/sample', function(stream) {
+//     stream.on('data', function(data) {
+//         console.log(util.inspect(data));
+//     });
+// });
 
 var torun = function(conn) {
 
     console.log('Running twitter scraping now');
 
-    var tweets = r.db('twitter').table('handles').filter(function(row) {
+    var tweets = r.db('twitter').table('handles')/*.filter(function(row) {
         return row.hasFields('user_id').not();
-    }).run(conn, function(err, cursor) {
+    })*/.run(conn, function(err, cursor) {
+
+
+        //
+        // if (idhandles count !== handles in tweet stream count){
+        //     end current stream and start new stream
+        // }
+
+
+        // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        // 1.Select handles with user_id field
+        // 2.If the number of handles with id matches number in stream, do nothing
+        // 3.If the number of handles with id doesn't match number in stream, end stream and start new stream with all handles in database
+        // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
         cursor.toArray(function(err, results) {
 
+            var ids = [];
+
             results.forEach(function(result) {
 
-                console.log(result.handle);
+                if (result.user_id) return;
 
                 twitter
                     .verifyCredentials(function() {})
@@ -55,11 +79,6 @@ var torun = function(conn) {
                         if (data.statusCode) return;
 
                         r.db('twitter').table('handles').get(result.handle).update({ user_id: data.id }).run(conn, function(err, summary) {
-                            console.log(err);
-                            console.log(summary);
-                        });
-
-                        r.db('twitter').table('handles').get(result.handle).hasFields('user_id').eq(!null).run(conn, function(err, summary) {
                             console.log(err);
                             console.log(summary);
                         });
@@ -82,6 +101,29 @@ var torun = function(conn) {
                     })
                 ;
 
+            });
+
+            results.forEach(function(result) {
+
+                if (!result.user_id) return;
+
+                ids.push( result.user_id );
+
+            });
+
+            if (twitterstream) twitterstream.destroy();
+
+            twitter.stream('filter', { follow:ids }, function(stream) {
+
+                twitterstream = stream;
+
+                stream.on('data', function(data) {
+
+                    console.log(data);
+
+                    console.log(data.user.screen_name);
+
+                });
 
             });
 
@@ -90,6 +132,12 @@ var torun = function(conn) {
     });
 
 };
+
+// var results = db.get('asd');
+//
+// db.get('asd', function(results) {
+//     console.log(results);
+// });
 
 // ++++++++++++++++++++++++++++++++++++
 // Poll the database in a timer and
